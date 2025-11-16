@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lightning Defender</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #222;
+      color: #f4f4f4;
+      text-align: center;
+      margin: 0;
+      padding-top: 20px;
+    }
+
+    h1 {
+      margin-bottom: 5px;
+    }
+
+    #instructions {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    #info-bar {
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    #info-bar span {
+      font-weight: bold;
+    }
+
+    #game-area {
+      margin: 20px auto;
+      width: 800px;
+      height: 600px;
+      border: 2px solid #555;
+      background: #111;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Player wrapper is centered in the game area */
+    #player-wrapper {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+
+    /* The player is a circle that can rotate */
+    #player {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      margin-left: -20px; /* center circle around wrapper's 0,0 */
+      margin-top: -20px;
+      border-radius: 50%;
+      background: #4caf50;
+      box-shadow: 0 0 10px rgba(76, 175, 80, 0.8);
+      transform-origin: 50% 50%;
+      transform: rotate(0deg);
+    }
+
+    /* A little "nose" to show which way the player is facing */
+    #player::after {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 16px;
+      background: #ffffff;
+      border-radius: 3px;
+      top: -6px;              /* sticks out above the circle */
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+    }
+
+    /* Scream text above the player */
+    #scream {
+      position: absolute;
+      top: -60px;
+      left: -40px;
+      width: 80px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      color: #ff5252;
+      text-shadow: 0 0 8px rgba(255, 82, 82, 0.9);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.05s;
+    }
+
+    /* One-liner text above the player */
+    #oneshout {
+      position: absolute;
+      top: -90px;
+      left: -80px;
+      width: 160px;
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+      color: #4fc3f7;
+      text-shadow: 0 0 8px rgba(79, 195, 247, 0.9);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s;
+    }
+
+    /* Lightning bolt projectile */
+    .bolt {
+      position: absolute;
+      width: 6px;
+      height: 24px;
+      background: #ffeb3b;
+      box-shadow: 0 0 10px rgba(255, 235, 59, 0.9);
+      border-radius: 3px;
+      transform-origin: 50% 50%;
+    }
+
+    /* Enemy base styles */
+    .enemy {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(239, 83, 80, 0.9);
+    }
+
+    /* Type A: fast, 1 hit – red */
+    .enemy-fast {
+      background: #e53935;
+      box-shadow: 0 0 10px rgba(239, 83, 80, 0.9);
+    }
+
+    /* Type B: slow, 3 hits – purple */
+    .enemy-tank {
+      background: #8e24aa;
+      box-shadow: 0 0 10px rgba(171, 71, 188, 0.9);
+    }
+
+    /* Hit / explosion animation on death */
+    .enemy-hit {
+      animation: explode 0.25s forwards;
+    }
+
+    @keyframes explode {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(2.2);
+        opacity: 0;
+      }
+    }
+
+    /* Brief flash when damaged but not killed */
+    .enemy-damaged {
+      animation: damage-flash 0.15s forwards;
+    }
+
+    @keyframes damage-flash {
+      0% {
+        filter: brightness(1.5);
+      }
+      100% {
+        filter: brightness(1);
+      }
+    }
+
+    /* Win banner overlay */
+    #win-banner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      font-size: 72px;
+      font-weight: 900;
+      color: #ffeb3b;
+      text-shadow: 0 0 20px rgba(255, 235, 59, 1);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s;
+    }
+
+    #controls {
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 6px 12px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+
+    #start-btn {
+      background: #4caf50;
+      color: white;
+    }
+
+    #start-btn:disabled {
+      background: #777;
+      cursor: default;
+    }
+
+    #message {
+      margin-top: 10px;
+      min-height: 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Lightning Defender</h1>
+  <div id="instructions">
+    ⬅️ Left / ➡️ Right to rotate &nbsp; | &nbsp; Space to shoot ⚡ &nbsp; | &nbsp; Survive 60 seconds
+  </div>
+
+  <div id="info-bar">
+    Score: <span id="score">0</span>
+    &nbsp;|&nbsp;
+    Time: <span id="time">60</span>s
+  </div>
+
+  <div id="game-area">
+    <div id="player-wrapper">
+      <div id="player"></div>
+      <div id="scream">Aaaah!</div>
+      <div id="oneshout"></div>
+    </div>
+    <div id="win-banner">YOU WIN!</div>
+  </div>
+
+  <div id="controls">
+    <button id="start-btn">Start Game</button>
+  </div>
+
+  <div id="message"></div>
+
+  <script>
+    const gameArea = document.getElementById("game-area");
+    const player = document.getElementById("player");
+    const screamEl = document.getElementById("scream");
+    const oneShoutEl = document.getElementById("oneshout");
+    const winBanner = document.getElementById("win-banner");
+    const scoreSpan = document.getElementById("score");
+    const timeSpan = document.getElementById("time");
+    const startBtn = document.getElementById("start-btn");
+    const message = document.getElementById("message");
+
+    // Player angle in degrees: 0 = facing up
+    let angle = 0;
+
+    // Game state
+    let score = 0;
+    let killCount = 0;
+    let gameRunning = false;
+    let enemies = [];
+    let enemySpawnIntervalId = null;
+    let timeLeft = 60;
+    let timerId = null;
+
+    const areaWidth = () => gameArea.clientWidth;
+    const areaHeight = () => gameArea.clientHeight;
+
+    const playerRadius = 20; // 40px circle
+    const enemyRadius = 15;  // 30px enemy
+
+    function updatePlayerRotation() {
+      player.style.transform = `rotate(${angle}deg)`;
+    }
+
+    // --------- SCREAM ---------
+
+    function playScreamSound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = "square";
+        const now = ctx.currentTime;
+        osc.frequency.setValueAtTime(500, now);
+        osc.frequency.linearRampToValueAtTime(900, now + 0.15);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.2);
+
+        osc.start(now);
+        osc.stop(now + 0.22);
+      } catch (e) {
+        // ignore if audio context not available
+      }
+    }
+
+    function triggerScream() {
+      screamEl.style.opacity = "1";
+      playScreamSound();
+      setTimeout(() => {
+        screamEl.style.opacity = "0";
+      }, 200);
+    }
+
+    // --------- ONE-LINERS ON KILLS ---------
+
+    const oneLiners = [
+      "Take that!",
+      "Yee-haw!",
+      "Eat it!",
+      "Amateurs!",
+      "Boom!",
+      "Easy peasy!"
+    ];
+
+    function triggerOneLiner() {
+      const line = oneLiners[Math.floor(Math.random() * oneLiners.length)];
+      oneShoutEl.textContent = line;
+      oneShoutEl.style.opacity = "1";
+
+      // Tiny voice-like chirp
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = "sawtooth";
+          const now = ctx.currentTime;
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.linearRampToValueAtTime(450, now + 0.12);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        }
+      } catch (e) {}
+
+      setTimeout(() => {
+        oneShoutEl.style.opacity = "0";
+      }, 400);
+    }
+
+    // ----- TIMER -----
+    function startTimer() {
+      timeLeft = 60;
+      timeSpan.textContent = timeLeft;
+      if (timerId !== null) clearInterval(timerId);
+
+      timerId = setInterval(() => {
+        if (!gameRunning) return;
+        timeLeft--;
+        timeSpan.textContent = timeLeft;
+        if (timeLeft <= 0) {
+          winGame();
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    }
+
+    // ----- ENEMY SPAWNING & MOVEMENT -----
+
+    function spawnEnemy() {
+      if (!gameRunning) return;
+
+      const enemyEl = document.createElement("div");
+      enemyEl.classList.add("enemy");
+
+      // Choose type: fast (1 hit) or tank (3 hits)
+      const isTank = Math.random() < 0.4; // ~40% tanks, 60% fast
+      let speed;
+      let hp;
+      if (isTank) {
+        enemyEl.classList.add("enemy-tank");
+        speed = 0.8; // slower
+        hp = 3;
+      } else {
+        enemyEl.classList.add("enemy-fast");
+        speed = 1.1; // faster
+        hp = 1;
+      }
+
+      gameArea.appendChild(enemyEl);
+
+      // Spawn at a random edge
+      const w = areaWidth();
+      const h = areaHeight();
+      const edge = Math.floor(Math.random() * 4); // 0=top,1=right,2=bottom,3=left
+      let x, y;
+
+      if (edge === 0) {          // top
+        x = Math.random() * w;
+        y = 0;
+      } else if (edge === 1) {   // right
+        x = w;
+        y = Math.random() * h;
+      } else if (edge === 2) {   // bottom
+        x = Math.random() * w;
+        y = h;
+      } else {                   // left
+        x = 0;
+        y = Math.random() * h;
+      }
+
+      const playerX = w / 2;
+      const playerY = h / 2;
+
+      const dx = playerX - x;
+      const dy = playerY - y;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      const vx = (dx / dist) * speed;
+      const vy = (dy / dist) * speed;
+
+      const enemy = {
+        el: enemyEl,
+        x,
+        y,
+        vx,
+        vy,
+        hp,
+        alive: true,
+        screamed: false
+      };
+      enemies.push(enemy);
+
+      function stepEnemy() {
+        if (!gameRunning || !enemy.alive) return;
+
+        enemy.x += enemy.vx;
+        enemy.y += enemy.vy;
+
+        enemyEl.style.left = (enemy.x - enemyRadius) + "px";
+        enemyEl.style.top = (enemy.y - enemyRadius) + "px";
+
+        const dxP = playerX - enemy.x;
+        const dyP = playerY - enemy.y;
+        const distToPlayer = Math.hypot(dxP, dyP);
+        const collisionThreshold = playerRadius + enemyRadius;
+
+        // Scream when ~10px before collision
+        if (!enemy.screamed && distToPlayer < collisionThreshold + 10) {
+          enemy.screamed = true;
+          triggerScream();
+        }
+
+        // Collision with player
+        if (distToPlayer < collisionThreshold) {
+          gameOver();
+          return;
+        }
+
+        requestAnimationFrame(stepEnemy);
+      }
+
+      enemyEl.style.left = (enemy.x - enemyRadius) + "px";
+      enemyEl.style.top = (enemy.y - enemyRadius) + "px";
+      requestAnimationFrame(stepEnemy);
+    }
+
+    function startSpawningEnemies() {
+      spawnEnemy();
+      enemySpawnIntervalId = setInterval(() => {
+        if (gameRunning) {
+          spawnEnemy();
+        }
+      }, 1500);
+    }
+
+    function stopSpawningEnemies() {
+      if (enemySpawnIntervalId !== null) {
+        clearInterval(enemySpawnIntervalId);
+        enemySpawnIntervalId = null;
+      }
+    }
+
+    // ----- HITTING ENEMIES -----
+
+    function killEnemy(enemy) {
+      if (!enemy.alive) return;
+      enemy.alive = false;
+
+      score++;
+      scoreSpan.textContent = score;
+
+      killCount++;
+      // Every other kill => one-liner
+      if (killCount % 2 === 0) {
+        triggerOneLiner();
+      }
+
+      enemy.el.classList.add("enemy-hit");
+      setTimeout(() => {
+        enemy.el.remove();
+      }, 250);
+      enemies = enemies.filter(e => e !== enemy);
+    }
+
+    function damageEnemy(enemy, amount) {
+      if (!enemy.alive) return;
+      enemy.hp -= amount;
+      if (enemy.hp <= 0) {
+        killEnemy(enemy);
+      } else {
+        enemy.el.classList.remove("enemy-damaged");
+        void enemy.el.offsetWidth; // force reflow
+        enemy.el.classList.add("enemy-damaged");
+      }
+    }
+
+    // ----- LIGHTNING BOLTS -----
+
+    function fireBolt() {
+      if (!gameRunning) return;
+
+      const bolt = document.createElement("div");
+      bolt.classList.add("bolt");
+      gameArea.appendChild(bolt);
+
+      const w = areaWidth();
+      const h = areaHeight();
+
+      // Start at center
+      let x = w / 2;
+      let y = h / 2;
+
+      const speed = 8;
+      const rad = angle * Math.PI / 180;
+      const dx = speed * Math.sin(rad);
+      const dy = -speed * Math.cos(rad);
+
+      function step() {
+        if (!gameRunning) {
+          bolt.remove();
+          return;
+        }
+
+        x += dx;
+        y += dy;
+
+        bolt.style.left = (x - 3) + "px";
+        bolt.style.top = (y - 12) + "px";
+        bolt.style.transform = `rotate(${angle}deg)`;
+
+        // Collision with enemies
+        for (const enemy of enemies) {
+          if (!enemy.alive) continue;
+          const ex = enemy.x;
+          const ey = enemy.y;
+          const dist = Math.hypot(x - ex, y - ey);
+          if (dist < enemyRadius + 10) {
+            damageEnemy(enemy, 1);
+            bolt.remove();
+            return;
+          }
+        }
+
+        if (
+          x < -50 ||
+          x > w + 50 ||
+          y < -50 ||
+          y > h + 50
+        ) {
+          bolt.remove();
+        } else {
+          requestAnimationFrame(step);
+        }
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    // ----- GAME CONTROL -----
+
+    function resetGameState() {
+      score = 0;
+      killCount = 0;
+      scoreSpan.textContent = score;
+      timeLeft = 60;
+      timeSpan.textContent = timeLeft;
+      message.textContent = "";
+      angle = 0;
+      updatePlayerRotation();
+      screamEl.style.opacity = "0";
+      oneShoutEl.style.opacity = "0";
+      winBanner.style.opacity = "0";
+
+      enemies.forEach(e => e.el.remove());
+      enemies = [];
+      document.querySelectorAll(".bolt").forEach(b => b.remove());
+    }
+
+    function startGame() {
+      resetGameState();
+      gameRunning = true;
+      startBtn.disabled = true;
+      startTimer();
+      startSpawningEnemies();
+    }
+
+    function endGameBase() {
+      gameRunning = false;
+      stopSpawningEnemies();
+      stopTimer();
+    }
+
+    function gameOver() {
+      if (!gameRunning) return;
+      endGameBase();
+      message.textContent = "Game over! An enemy reached you. Final score: " + score;
+      startBtn.disabled = false;
+    }
+
+    function winGame() {
+      if (!gameRunning) return;
+      endGameBase();
+      message.textContent = "You survived 60 seconds! Final score: " + score;
+      winBanner.style.opacity = "1";
+      startBtn.disabled = false;
+    }
+
+    // ----- INPUT -----
+
+    document.addEventListener("keydown", (event) => {
+      if (
+        event.code === "ArrowLeft" ||
+        event.code === "ArrowRight" ||
+        event.code === "Space"
+      ) {
+        event.preventDefault();
+      }
+
+      if (event.code === "ArrowLeft") {
+        angle -= 10;
+        updatePlayerRotation();
+      } else if (event.code === "ArrowRight") {
+        angle += 10;
+        updatePlayerRotation();
+      } else if (event.code === "Space") {
+        fireBolt();
+      }
+    });
+
+    startBtn.addEventListener("click", startGame);
+
+    // Initial orientation
+    updatePlayerRotation();
+  </script>
+</body>
+</html>
