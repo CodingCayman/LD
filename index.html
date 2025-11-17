@@ -127,8 +127,8 @@
     /* Enemy base styles */
     .enemy {
       position: absolute;
-      width: 30px;
-      height: 30px;
+      width: 45px;
+      height: 45px;
       border-radius: 50%;
       box-shadow: 0 0 10px rgba(239, 83, 80, 0.9);
     }
@@ -325,12 +325,12 @@
     }
 
     function rotateLeft() {
-      angle -= 10;
+      angle -= 7;
       updatePlayerRotation();
     }
 
     function rotateRight() {
-      angle += 10;
+      angle += 7;
       updatePlayerRotation();
     }
 
@@ -448,11 +448,11 @@
       let hp;
       if (isTank) {
         enemyEl.classList.add("enemy-tank");
-        speed = 0.8; // slower
+        speed = 0.7; // slower
         hp = 3;
       } else {
         enemyEl.classList.add("enemy-fast");
-        speed = 1.1; // faster
+        speed = 1.0; // faster
         hp = 1;
       }
 
