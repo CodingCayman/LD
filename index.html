@@ -698,7 +698,7 @@
       startBtn.disabled = false;
     }
 
-    // ----- INPUT -----
+    // ----- KEYBOARD INPUT -----
 
     document.addEventListener("keydown", (event) => {
       if (
@@ -718,17 +718,47 @@
       }
     });
 
-    // Touch / click controls
-    function bindControlButton(btn, handler) {
-      btn.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        handler();
-      });
+    // ----- TOUCH / MOUSE HOLD CONTROLS -----
+
+    let leftInterval = null;
+    let rightInterval = null;
+    let fireInterval = null;
+
+    function startHold(intervalRefName, fn, intervalMs) {
+      // Run once immediately
+      fn();
+      // Then keep running while held
+      if (intervalRefName.value) clearInterval(intervalRefName.value);
+      intervalRefName.value = setInterval(fn, intervalMs);
     }
 
-    bindControlButton(btnLeft, rotateLeft);
-    bindControlButton(btnRight, rotateRight);
-    bindControlButton(btnFire, fireBolt);
+    function stopHold(intervalRefName) {
+      if (intervalRefName.value) {
+        clearInterval(intervalRefName.value);
+        intervalRefName.value = null;
+      }
+    }
+
+    const leftRef = { value: null };
+    const rightRef = { value: null };
+    const fireRef = { value: null };
+
+    function bindHoldButton(btn, ref, fn, intervalMs) {
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        startHold(ref, fn, intervalMs);
+      });
+
+      const stop = () => stopHold(ref);
+
+      btn.addEventListener("pointerup", stop);
+      btn.addEventListener("pointerleave", stop);
+      btn.addEventListener("pointercancel", stop);
+    }
+
+    bindHoldButton(btnLeft, leftRef, rotateLeft, 90);   // rotate about every 90ms
+    bindHoldButton(btnRight, rightRef, rotateRight, 90);
+    bindHoldButton(btnFire, fireRef, fireBolt, 200);    // fire ~5 shots/sec
 
     startBtn.addEventListener("click", startGame);
 
